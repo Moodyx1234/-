@@ -1,1070 +1,0 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة وصال - حاضنة رقمية</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=fOGnNAHcKCpKEZiPsvV6&callback=initMap"></script>
-    
-    <style>
-        /* إعداد الخط الافتراضي */
-        body {
-            font-family: 'Inter', sans-serif;
-            scroll-behavior: smooth;
-        }
-        
-        /* إخفاء الأقسام لإدارة التنقل في صفحة واحدة */
-        .section {
-            display: none;
-        }
-        /* إظهار القسم النشط */
-        .section.active {
-            display: block;
-        }
-
-        /* أنماط الخريطة التفاعلية (نقاط التفاعل فوق الخريطة) */
-        .map-pin {
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 2px solid #fff;
-            box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
-            transform: translate(-50%, -50%); /* لمركزة النقطة على الإحداثي */
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            cursor: pointer;
-            z-index: 20;
-        }
-
-        .map-pin[data-active="true"]:hover, .map-pin[data-selected="true"] {
-            transform: translate(-50%, -50%) scale(1.3);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 10px var(--pin-color);
-        }
-        
-        .map-pin[data-active="false"] {
-            cursor: default;
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        /* ألوان مستويات الاحتياج (لتلوين الـ Pins) */
-        .need-high { background-color: #ef4444; --pin-color: #ef4444; } /* Red */
-        .need-medium { background-color: #f59e0b; --pin-color: #f59e0b; } /* Amber */
-        .need-low { background-color: #22c55e; --pin-color: #22c55e; } /* Green */
-        
-        /* أنماط تسميات المناطق */
-        .map-label {
-            position: absolute;
-            font-size: 0.75rem;
-            font-weight: bold;
-            color: #1f2937;
-            pointer-events: none;
-            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
-            transform: translateX(-50%);
-            z-index: 15;
-            white-space: nowrap;
-        }
-        
-        /* النمط المخصص لـ div الخريطة الحقيقي */
-        #google-map {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            border-radius: 0.5rem; /* rounded-lg */
-            z-index: 10; 
-        }
-
-        .map-container {
-             /* نضمن أن حاوية الخريطة تحتوي العناصر المطلقة بداخله (Google map و Pins) */
-             position: relative;
-        }
-    </style>
-</head>
-<body class="bg-gray-100 text-gray-800">
-
-    <header class="bg-white shadow-md sticky top-0 z-50">
-        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <svg class="h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z" />
-                        </svg>
-                    </div>
-                    <div class="ms-3">
-                        <h1 class="text-xl font-bold text-blue-700">وصال</h1>
-                        <p class="text-xs text-gray-500">لجودة حياة أهل الخصاصة</p>
-                    </div>
-                </div>
-                
-                <div class="hidden md:flex md:items-center md:space-x-8 rtl:space-x-reverse">
-                    <a href="#" class="nav-link text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200" data-target="home-section">الرئيسية</a>
-                    <a href="#" class="nav-link text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200" data-target="projects-section">استعراض المشاريع</a>
-                    <a href="#" class="nav-link text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200" data-target="map-section">خريطة الأثر</a>
-                    <a href="#" class="nav-link text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200" data-target="donor-portal-section">بوابة المانحين</a>
-                    <a href="#" class="nav-link text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200" data-target="initiative-portal-section">قدم مبادرتك</a>
-                    <a href="#" class="nav-link text-gray-600 hover:text-blue-600 font-medium transition-colors duration-200" data-target="dashboard-section">لوحة التحكم</a>
-                </div>
-                
-                <div class="hidden md:flex items-center space-x-4 rtl:space-x-reverse">
-                    <a href="#" class="text-gray-600 hover:text-blue-600 transition duration-300 transform active:scale-95">تسجيل الدخول</a>
-                    <a href="#" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow transition duration-300 transform active:scale-95">سجل كداعم</a>
-                </div>
-                
-                <div class="md:hidden flex items-center">
-                    <button id="mobile-menu-button" class="text-gray-600 hover:text-gray-800 focus:outline-none">
-                        <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </nav>
-        
-        <div id="mobile-menu" class="md:hidden hidden bg-white shadow-lg">
-            <a href="#" class="nav-link block px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-blue-600" data-target="home-section">الرئيسية</a>
-            <a href="#" class="nav-link block px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-blue-600" data-target="projects-section">استعراض المشاريع</a>
-            <a href="#" class="nav-link block px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-blue-600" data-target="map-section">خريطة الأثر</a>
-            <a href="#" class="nav-link block px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-blue-600" data-target="donor-portal-section">بوابة المانحين</a>
-            <a href="#" class="nav-link block px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-blue-600" data-target="initiative-portal-section">قدم مبادرتك</a>
-            <a href="#" class="nav-link block px-4 py-3 text-gray-600 hover:bg-gray-100 hover:text-blue-600" data-target="dashboard-section">لوحة التحكم</a>
-            <div class="border-t border-gray-200 px-4 py-3 space-y-2">
-                <a href="#" class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow transition duration-300 transform active:scale-95">سجل كداعم</a>
-                <a href="#" class="block w-full text-center text-gray-600 hover:bg-gray-100 transition duration-300 transform active:scale-95">تسجيل الدخول</a>
-            </div>
-        </div>
-    </header>
-
-    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-        <section id="home-section" class="section">
-            <div class="bg-blue-600 rounded-2xl shadow-xl p-8 md:p-12 text-white overflow-hidden relative">
-                <div class="relative z-10 md:w-2/3">
-                    <h1 class="text-3xl md:text-5xl font-bold mb-4">تحسين حياة أهل الخصاصة عبر دعمك</h1>
-                    <p class="text-lg md:text-xl text-blue-100 mb-8">
-                        نعمل يداً بيد لجمع البيانات، وتصنيف الاحتياج، والتدخل بالمشاريع النوعية لخدمة الفئات
-                        الأكثر ضعفاً في المجتمع.
-                    </p>
-                    <div class="flex flex-col sm:flex-row gap-4">
-                        <button class="nav-link bg-white text-blue-700 font-semibold px-6 py-3 rounded-lg shadow-md hover:bg-gray-100 transition duration-300 transform active:scale-95 flex items-center justify-center" data-target="projects-section">
-                            <svg class="w-5 h-5 me-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                            👁 استعراض المشاريع
-                        </button>
-                        <button class="nav-link bg-blue-800 text-white font-semibold px-6 py-3 rounded-lg shadow-md hover:bg-blue-900 transition duration-300 transform active:scale-95 flex items-center justify-center" data-target="donor-portal-section">
-                            <svg class="w-5 h-5 me-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
-                            📝 شارك كممول / داعم
-                        </button>
-                        <button class="nav-link bg-transparent border-2 border-blue-300 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95 flex items-center justify-center" data-target="initiative-portal-section">
-                            <svg class="w-5 h-5 me-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-7.5 0m7.5 0a12.06 12.06 0 00-7.5 0m7.5 0c-3.11 0-5.903-.8-8.125-2.148M12 14.25c-3.11 0-5.903-.8-8.125-2.148m16.25 2.148c-2.222 1.348-5.015 2.148-8.125 2.148m0 0a12.06 12.06 0 01-7.5 0" /></svg>
-                            💡 قدم مبادرتك / تطوع
-                        </button>
-                    </div>
-                </div>
-                <svg class="absolute -start-10 -bottom-16 w-64 h-64 text-blue-500 opacity-20 transform scale-150" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.092 1.21-.138 2.43-.138 3.662 0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.092-1.21.138-2.43.138-3.662z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 my-12">
-                <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
-                    <div class="text-4xl font-bold text-blue-600 mb-2">500+</div>
-                    <div class="text-gray-600">مستفيد ومستفيدة</div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
-                    <div class="text-4xl font-bold text-blue-600 mb-2">25</div>
-                    <div class="text-gray-600">مشروع تحسيني</div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
-                    <div class="text-4xl font-bold text-blue-600 mb-2">15</div>
-                    <div class="text-gray-600">جهة مانحة وشريكة</div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm text-center">
-                    <div class="text-4xl font-bold text-blue-600 mb-2">8</div>
-                    <div class="text-gray-600">مدن مستهدفة</div>
-                </div>
-            </div>
-
-            <div class="my-12">
-                <h2 class="text-3xl font-bold text-center mb-8">المشاريع الجاهزة للدعم</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                        <div class="p-6">
-                            <span class="text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full font-medium">تأهيل سكني</span>
-                            <h3 class="text-xl font-bold my-3">تأهيل منازل كبار السن</h3>
-                            <p class="text-gray-600 mb-4 text-sm">توفير بيئة سكنية آمنة ومناسبة لكبار السن عبر ترميم وتحسين منازلهم.</p>
-                            <div class="text-2xl font-bold text-gray-800">25,000 <span class="text-sm font-normal">ريال</span></div>
-                            <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                        </div>
-                        <div class="mt-auto p-6 bg-gray-50">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: 45%"></div>
-                            </div>
-                            <div class="text-xs text-gray-500 mb-4">تم إنجاز 45%</div>
-                            <button class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95 open-support-modal" data-project-name="تأهيل منازل كبار السن">دعم المشروع</button>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                        <div class="p-6">
-                            <span class="text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full font-medium">دعم تعليمي</span>
-                            <h3 class="text-xl font-bold my-3">تدريب الأسر المنتجة</h3>
-                            <p class="text-gray-600 mb-4 text-sm">برامج تدريب حرفي وإداري لتمكين الأسر المنتجة من بدء مشاريعهم الخاصة.</p>
-                            <div class="text-2xl font-bold text-gray-800">12,500 <span class="text-sm font-normal">ريال</span></div>
-                            <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                        </div>
-                        <div class="mt-auto p-6 bg-gray-50">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                                <div class="bg-green-600 h-2.5 rounded-full" style="width: 10%"></div>
-                            </div>
-                            <div class="text-xs text-gray-500 mb-4">تم إنجاز 10%</div>
-                            <button class="w-full bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition duration-300 transform active:scale-95 open-support-modal" data-project-name="تدريب الأسر المنتجة">دعم المشروع</button>
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                        <div class="p-6">
-                            <span class="text-sm text-purple-600 bg-purple-100 px-3 py-1 rounded-full font-medium">رعاية أطفال</span>
-                            <h3 class="text-xl font-bold my-3">توفير الأجهزة التعويضية</h3>
-                            <p class="text-gray-600 mb-4 text-sm">دعم الأطفال ذوي الإعاقة بتوفير أجهزة تعويضية وسماعات طبية.</p>
-                            <div class="text-2xl font-bold text-gray-800">100,000 <span class="text-sm font-normal">ريال</span></div>
-                            <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                        </div>
-                        <div class="mt-auto p-6 bg-gray-50">
-                            <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                                <div class="bg-gray-400 h-2.5 rounded-full" style="width: 0%"></div>
-                            </div>
-                            <div class="text-xs text-gray-500 mb-4">بانتظار التمويل</div>
-                            <button class="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg hover:bg-gray-500 transition duration-300 transform active:scale-95 cursor-not-allowed" disabled>تمويل بالكامل</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="text-center mt-8">
-                    <button class="nav-link text-blue-600 font-semibold py-2 px-6 border-2 border-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition duration-300 transform active:scale-95" data-target="projects-section">
-                        عرض المزيد من المشاريع
-                    </button>
-                </div>
-            </div>
-            
-            <div class="my-12 py-12 bg-white rounded-2xl shadow-lg px-8">
-                <h2 class="text-3xl font-bold text-center mb-8">التقنيات الذكية في منصة وصال</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-center">
-                    <div class="p-6 bg-blue-50 rounded-lg">
-                        <h3 class="text-lg font-bold text-blue-700 mb-2">ربط مباشر ببيانات الجهات</h3>
-                        <p class="text-sm text-gray-600">لتحديد المستفيدين بدقة عبر الربط مع منصات مثل سكني والضمان الاجتماعي.</p>
-                    </div>
-                    <div class="p-6 bg-blue-50 rounded-lg">
-                        <h3 class="text-lg font-bold text-blue-700 mb-2">خريطة تفاعلية للفئات</h3>
-                        <p class="text-sm text-gray-600">استعراض جغرافي للاحتياج والدعم المقدم، مما يتيح لك رؤية أثر مساهمتك بوضوح.</p>
-                    </div>
-                    <div class="p-6 bg-blue-50 rounded-lg">
-                        <h3 class="text-lg font-bold text-blue-700 mb-2">تصنيف ذكي للفئات</h3>
-                        <p class="text-sm text-gray-600">نظام يحلل البيانات ويصنف الفئات تلقائيًا وفق المحددات الاجتماعية للصحة.</p>
-                    </div>
-                    <div class="p-6 bg-blue-50 rounded-lg">
-                        <h3 class="text-lg font-bold text-blue-700 mb-2">نظام تصويت مجتمعي</h3>
-                        <p class="text-sm text-gray-600">لإعطاء الأولوية للمشاريع الأكثر إلحاحًا من وجهة نظر أهالي الحي.</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="my-12">
-                <h2 class="text-2xl font-bold text-center text-gray-700 mb-6">شركاؤنا في الأثر</h2>
-                <div class="flex justify-center items-center gap-8 md:gap-16 flex-wrap opacity-60">
-                    <img src="https://placehold.co/120x60/EEE/AAA?text=وزارة+الموارد+البشرية" alt="شعار وزارة الموارد البشرية" class="h-12">
-                    <img src="https://placehold.co/120x60/EEE/AAA?text=برنامج+المدن+الصحية" alt="شعار برنامج المدن الصحية" class="h-12">
-                    <img src="https://placehold.co/120x60/EEE/AAA?text=البلديات" alt="شعار البلديات" class="h-12">
-                    <img src="https://placehold.co/120x60/EEE/AAA?text=الجمعيات+الأهلية" alt="شعار الجمعيات الأهلية" class="h-12">
-                </div>
-            </div>
-        </section>
-
-        <section id="projects-section" class="section">
-            <h2 class="text-3xl font-bold mb-8">المشاريع الجاهزة للدعم</h2>
-            
-            <div class="bg-white p-4 rounded-lg shadow-sm mb-8 flex flex-col md:flex-row gap-4">
-                <input type="text" placeholder="ابحث باسم المشروع..." class="flex-grow border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <select class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">كل أنواع التدخل</option>
-                    <option value="housing">تأهيل سكني</option>
-                    <option value="education">دعم تعليمي</option>
-                    <option value="health">رعاية صحية</option>
-                </select>
-                <select class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">كل الفئات</option>
-                    <option value="elderly">كبار السن</option>
-                    <option value="families">أسر منتجة</option>
-                    <option value="children">أطفال</option>
-                </select>
-                <select class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">الحالة</option>
-                    <option value="funding">بانتظار التمويل</option>
-                    <option value="progress">قيد التنفيذ</option>
-                    <option value="done">مكتمل</option>
-                </select>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                    <div class="p-6">
-                        <span class="text-sm text-blue-600 bg-blue-100 px-3 py-1 rounded-full font-medium">تأهيل سكني</span>
-                        <h3 class="text-xl font-bold my-3">تأهيل منازل كبار السن</h3>
-                        <p class="text-gray-600 mb-4 text-sm">توفير بيئة سكنية آمنة ومناسبة لكبار السن عبر ترميم وتحسين منازلهم.</p>
-                        <div class="text-2xl font-bold text-gray-800">25,000 <span class="text-sm font-normal">ريال</span></div>
-                        <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                    </div>
-                    <div class="mt-auto p-6 bg-gray-50">
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                            <div class="bg-blue-600 h-2.5 rounded-full" style="width: 45%"></div>
-                        </div>
-                        <div class="text-xs text-gray-500 mb-4">تم إنجاز 45%</div>
-                        <button class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95 open-support-modal" data-project-name="تأهيل منازل كبار السن">دعم المشروع</button>
-                    </div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                    <div class="p-6">
-                        <span class="text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full font-medium">دعم تعليمي</span>
-                        <h3 class="text-xl font-bold my-3">تدريب الأسر المنتجة</h3>
-                        <p class="text-gray-600 mb-4 text-sm">برامج تدريب حرفي وإداري لتمكين الأسر المنتجة من بدء مشاريعهم الخاصة.</p>
-                        <div class="text-2xl font-bold text-gray-800">12,500 <span class="text-sm font-normal">ريال</span></div>
-                        <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                    </div>
-                    <div class="mt-auto p-6 bg-gray-50">
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                            <div class="bg-green-600 h-2.5 rounded-full" style="width: 10%"></div>
-                        </div>
-                        <div class="text-xs text-gray-500 mb-4">تم إنجاز 10%</div>
-                        <button class="w-full bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition duration-300 transform active:scale-95 open-support-modal" data-project-name="تدريب الأسر المنتجة">دعم المشروع</button>
-                    </div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                    <div class="p-6">
-                        <span class="text-sm text-purple-600 bg-purple-100 px-3 py-1 rounded-full font-medium">رعاية أطفال</span>
-                        <h3 class="text-xl font-bold my-3">توفير الأجهزة التعويضية</h3>
-                        <p class="text-gray-600 mb-4 text-sm">دعم الأطفال ذوي الإعاقة بتوفير أجهزة تعويضية وسماعات طبية.</p>
-                        <div class="text-2xl font-bold text-gray-800">100,000 <span class="text-sm font-normal">ريال</span></div>
-                        <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                    </div>
-                    <div class="mt-auto p-6 bg-gray-50">
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                            <div class="bg-gray-400 h-2.5 rounded-full" style="width: 0%"></div>
-                        </div>
-                        <div class="text-xs text-gray-500 mb-4">بانتظار التمويل</div>
-                        <button class="w-full bg-gray-400 text-white font-semibold py-3 rounded-lg hover:bg-gray-500 transition duration-300 transform active:scale-95 cursor-not-allowed" disabled>تمويل بالكامل</button>
-                    </div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-                    <div class="p-6">
-                        <span class="text-sm text-red-600 bg-red-100 px-3 py-1 rounded-full font-medium">رعاية صحية</span>
-                        <h3 class="text-xl font-bold my-3">قوافل طبية للأحياء</h3>
-                        <p class="text-gray-600 mb-4 text-sm">تسيير قوافل طبية متنقلة لتقديم الكشوفات الأولية والأدوية في الأحياء المستهدفة.</p>
-                        <div class="text-2xl font-bold text-gray-800">75,000 <span class="text-sm font-normal">ريال</span></div>
-                        <div class="text-gray-500 text-xs mb-4">التكلفة التقديرية</div>
-                    </div>
-                    <div class="mt-auto p-6 bg-gray-50">
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                            <div class="bg-red-600 h-2.5 rounded-full" style="width: 80%"></div>
-                        </div>
-                        <div class="text-xs text-gray-500 mb-4">تم إنجاز 80%</div>
-                        <button class="w-full bg-red-600 text-white font-semibold py-3 rounded-lg hover:bg-red-700 transition duration-300 transform active:scale-95 open-support-modal" data-project-name="قوافل طبية للأحياء">دعم المشروع</button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="map-section" class="section">
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-bold">استكشف خريطة الأثر</h2>
-                <p class="text-lg text-gray-600 mt-2">شاهد كيف تحسن المشاريع حياة الناس حولك وساهم في تطوير حيّك</p>
-            </div>
-            
-            <div class="flex flex-col lg:flex-row gap-8">
-                <div class="lg:w-3/5 bg-white p-6 rounded-2xl shadow-xl">
-                    <h3 class="text-xl font-bold mb-4">خريطة الاحتياج والدعم (خرائط Maptiler / Google)</h3>
-                    
-                    <div class="map-container relative bg-gray-100 rounded-lg overflow-hidden" style="padding-bottom: 120%;"> 
-                        
-                        <div id="google-map"></div> 
-                        
-                        <div id="map-hotspots" class="absolute inset-0">
-                            
-                            <div class="map-pin need-high" data-region="منطقة الرياض" data-lat="24.7136" data-lng="46.6753" data-active="true" style="top: 35%; left: 65%;"></div>
-                            <span class="map-label" data-lat="24.7136" data-lng="46.6753">الرياض</span>
-
-                            <div class="map-pin need-high" data-region="المنطقة الشمالية" data-lat="30.9858" data-lng="41.0378" data-active="true" style="top: 10%; left: 55%;"></div>
-                            <span class="map-label" data-lat="30.9858" data-lng="41.0378">الحدود الشمالية</span>
-
-                            <div class="map-pin need-low" data-region="المنطقة الشرقية" data-lat="26.3986" data-lng="50.1011" data-active="true" style="top: 45%; left: 85%;"></div>
-                            <span class="map-label" data-lat="26.3986" data-lng="50.1011">الدمام</span>
-                            
-                            <div class="map-pin need-medium" data-region="منطقة مكة المكرمة" data-lat="21.4858" data-lng="39.1925" data-active="true" style="top: 60%; left: 20%;"></div>
-                            <span class="map-label" data-lat="21.4858" data-lng="39.1925">مكة/جدة</span>
-
-                            <div class="map-pin need-medium" data-region="منطقة عسير" data-lat="18.2255" data-lng="42.5855" data-active="true" style="top: 80%; left: 35%;"></div>
-                            <span class="map-label" data-lat="18.2255" data-lng="42.5855">عسير/أبها</span>
-
-                            <span class="map-label" style="top: 25%; left: 15%; opacity: 0.5;">تبوك</span>
-                            <span class="map-label" style="top: 20%; left: 35%; opacity: 0.5;">الجوف</span>
-                            <span class="map-label" style="top: 30%; left: 35%; opacity: 0.5;">حائل</span>
-                            <span class="map-label" style="top: 50%; left: 30%; opacity: 0.5;">المدينة</span>
-                            <span class="map-label" style="top: 85%; left: 60%; opacity: 0.5;">نجران</span>
-                            
-                        </div>
-                    </div>
-                    <div class="flex justify-center gap-6 mt-4">
-                        <div class="flex items-center"><span class="w-4 h-4 rounded-full bg-red-500 me-2"></span> احتياج عالٍ</div>
-                        <div class="flex items-center"><span class="w-4 h-4 rounded-full bg-amber-500 me-2"></span> احتياج متوسط</div>
-                        <div class="flex items-center"><span class="w-4 h-4 rounded-full bg-green-500 me-2"></span> احتياج منخفض</div>
-                    </div>
-                </div>
-                
-                <div id="map-sidebar" class="lg:w-2/5">
-                    <div class="bg-white p-6 rounded-2xl shadow-xl sticky top-24">
-                        <h3 id="map-region-name" class="text-2xl font-bold mb-6">انقر على نقطة لعرض البيانات</h3>
-                        
-                        <div id="map-region-data" class="hidden space-y-4">
-                            <div class="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
-                                <span class="text-gray-600">عدد الأسر المستفيدة:</span>
-                                <span id="data-families" class="font-bold text-lg text-blue-600"></span>
-                            </div>
-                            <div class="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
-                                <span class="text-gray-600">المشاريع المنفذة:</span>
-                                <span id="data-projects-done" class="font-bold text-lg text-green-600"></span>
-                            </div>
-                            <div class="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
-                                <span class="text-gray-600">مشاريع قيد التنفيذ:</span>
-                                <span id="data-projects-progress" class="font-bold text-lg text-amber-600"></span>
-                            </div>
-                            <div class="flex justify-between items-center bg-gray-100 p-3 rounded-lg">
-                                <span class="text-gray-600">مجموع المساهمات:</span>
-                                <span id="data-contributions" class="font-bold text-lg text-gray-800"></span>
-                            </div>
-                            
-                            <h4 class="text-lg font-semibold pt-4">أبرز الداعمين في المنطقة</h4>
-                            <div id="data-donors" class="space-y-2">
-                                </div>
-                            
-                            <button class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95 mt-6">
-                                ادعم هذا الحي
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="my-12 py-12 bg-white rounded-2xl shadow-xl px-8">
-                <h2 class="text-3xl font-bold text-center mb-8">لوحة شرف الداعمين والأحياء</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div>
-                        <h3 class="text-xl font-bold text-blue-700 mb-4">🔹 أكثر 10 داعمين نشاطًا</h3>
-                        <ul class="space-y-3">
-                            <li class="flex items-center p-3 bg-gray-100 rounded-lg">
-                                <span class="text-lg font-bold text-amber-500 me-3">🥇</span>
-                                <img src="https://placehold.co/40x40/blue/white?text=ش1" alt="شعار" class="w-10 h-10 rounded-full me-3 border-2 border-amber-500">
-                                <span class="font-semibold">شركة العطاء للتطوير</span>
-                            </li>
-                            <li class="flex items-center p-3 bg-gray-100 rounded-lg">
-                                <span class="text-lg font-bold text-gray-400 me-3">🥈</span>
-                                <img src="https://placehold.co/40x40/green/white?text=ش2" alt="شعار" class="w-10 h-10 rounded-full me-3 border-2 border-gray-400">
-                                <span class="font-semibold">مؤسسة البناء الخيري</span>
-                            </li>
-                            <li class="flex items-center p-3 bg-gray-100 rounded-lg">
-                                <span class="text-lg font-bold text-yellow-700 me-3">🥉</span>
-                                <img src="https://placehold.co/40x40/red/white?text=ش3" alt="شعار" class="w-10 h-10 rounded-full me-3 border-2 border-yellow-700">
-                                <span class="font-semibold">تاجر الخير (فاعل خير)</span>
-                            </li>
-                            <li class="flex items-center p-3 bg-gray-50 rounded-lg">
-                                <span class="text-gray-500 me-3 ms-1">4.</span>
-                                <img src="https://placehold.co/40x40/purple/white?text=ش4" alt="شعار" class="w-10 h-10 rounded-full me-3">
-                                <span class="font-semibold">مجموعة سديم القابضة</span>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <div>
-                        <h3 class="text-xl font-bold text-green-700 mb-4">🏘 الأحياء الأكثر تحسنًا (آخر ربع)</h3>
-                        <ul class="space-y-3">
-                            <li class="flex items-center p-3 bg-gray-100 rounded-lg">
-                                <span class="text-lg font-bold text-amber-500 me-3">🥇</span>
-                                <span class="font-semibold">حي الياسمين (الرياض)</span>
-                            </li>
-                            <li class="flex items-center p-3 bg-gray-100 rounded-lg">
-                                <span class="text-lg font-bold text-gray-400 me-3">🥈</span>
-                                <span class="font-semibold">حي النسيم (جدة)</span>
-                            </li>
-                            <li class="flex items-center p-3 bg-gray-100 rounded-lg">
-                                <span class="text-lg font-bold text-yellow-700 me-3">🥉</span>
-                                <span class="font-semibold">حي العزيزية (الدمام)</span>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <div>
-                        <h3 class="text-xl font-bold text-purple-700 mb-4">📈 مؤشر عافية الحي (حي الياسمين)</h3>
-                        <div class="bg-purple-100 p-6 rounded-lg text-center">
-                            <div class="text-5xl font-bold text-purple-700">82%</div>
-                            <div class="text-gray-600 mt-2">مؤشر تركيبي يقيس التحسن الاجتماعي والصحي</div>
-                            <div class="w-full bg-gray-200 rounded-full h-4 mt-4">
-                                <div class="bg-purple-600 h-4 rounded-full" style="width: 82%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="donor-portal-section" class="section">
-            <div class="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-xl">
-                <h2 class="text-3xl font-bold mb-2">بوابة الجهات المانحة</h2>
-                <p class="text-gray-600 mb-8">شارك في الأثر وسجل بيانات جهتك لاستعراض المشاريع وتوقيع ميثاق الدعم.</p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <form class="space-y-6">
-                        <h3 class="text-xl font-semibold">تسجيل بيانات الجهة</h3>
-                        <div>
-                            <label for="org-name" class="block text-sm font-medium text-gray-700">اسم الجهة / التاجر</label>
-                            <input type="text" id="org-name" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label for="org-type" class="block text-sm font-medium text-gray-700">نوع الجهة</label>
-                            <select id="org-type" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option>شركة</option>
-                                <option>مؤسسة مانحة</option>
-                                <option>فاعل خير / تاجر</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="org-email" class="block text-sm font-medium text-gray-700">البريد الإلكتروني للمسؤول</label>
-                            <input type="email" id="org-email" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label for="org-phone" class="block text-sm font-medium text-gray-700">رقم الجوال</label>
-                            <input type="tel" id="org-phone" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95">تسجيل</button>
-                    </form>
-                    
-                    <div class="bg-blue-50 p-6 rounded-lg">
-                        <h3 class="text-xl font-semibold mb-4">مميزات بوابة المانحين</h3>
-                        <ul class="space-y-4">
-                            <li class="flex items-start">
-                                <svg class="w-6 h-6 text-blue-600 me-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span>استعراض قائمة المشاريع المفلترة والمناسبة لتوجهاتكم.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg class="w-6 h-6 text-blue-600 me-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span>اختيار مشروع وتوقيع ميثاق دعم إلكتروني موثق.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg class="w-6 h-6 text-blue-600 me-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span>الحصول على تقارير تنفيذ ومؤشرات أداء شفافة ومحدثة.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg class="w-6 h-6 text-blue-600 me-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                <span>شهادات تكريم وشكر لجهودكم في المسؤولية الاجتماعية.</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="initiative-portal-section" class="section">
-            <div class="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-xl">
-                <h2 class="text-3xl font-bold mb-2">بوابة المبادرات الفردية / المجتمعية</h2>
-                <p class="text-gray-600 mb-8">لديك فكرة لمشروع تحسيني؟ قدمها لنا لنقوم بدراستها وربطها بالداعمين.</p>
-                
-                <form class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="init-name" class="block text-sm font-medium text-gray-700">اسم المشروع / المبادرة</label>
-                            <input type="text" id="init-name" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label for="init-type" class="block text-sm font-medium text-gray-700">نوع المشروع (سكني، صحي، تعليمي...)</label>
-                            <input type="text" id="init-type" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label for="init-target" class="block text-sm font-medium text-gray-700">الفئة المستهدفة</label>
-                            <input type="text" id="init-target" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label for="init-location" class="block text-sm font-medium text-gray-700">المدينة / الحي المقترح</label>
-                            <input type="text" id="init-location" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="init-implementer" class="block text-sm font-medium text-gray-700">الجهة المقترحة للتنفيذ (إن وجدت)</label>
-                        <input type="text" id="init-implementer" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-                    
-                    <div>
-                        <label for="init-impact" class="block text-sm font-medium text-gray-700">الأثر المجتمعي المتوقع</label>
-                        <textarea id="init-impact" rows="4" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                    </div>
-
-                    <div>
-                        <label for="init-cost" class="block text-sm font-medium text-gray-700">التكلفة التقديرية (ريال)</label>
-                        <input type="number" id="init-cost" class="mt-1 block w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95">تقديم المبادرة</button>
-                </form>
-            </div>
-        </section>
-
-        <section id="dashboard-section" class="section">
-            <h2 class="text-3xl font-bold mb-8">لوحة تحكم برنامج المدن الصحية</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-2xl shadow-lg">
-                    <div class="text-gray-500 mb-1">المشاريع النشطة</div>
-                    <div class="text-3xl font-bold text-blue-600">25</div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-lg">
-                    <div class="text-gray-500 mb-1">الجهات المانحة</div>
-                    <div class="text-3xl font-bold text-green-600">15</div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-lg">
-                    <div class="text-gray-500 mb-1">المستفيدون (آخر 30 يوم)</div>
-                    <div class="text-3xl font-bold text-purple-600">+500</div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-lg">
-                    <div class="text-gray-500 mb-1">إجمالي التمويل</div>
-                    <div class="text-3xl font-bold text-gray-800">1.2M <span class="text-lg">ريال</span></div>
-                </div>
-            </div>
-            
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4">توزيع المشاريع والمستفيدين (محاكاة)</h3>
-                    <div class="bg-gray-200 rounded-lg h-64 flex items-center justify-center text-gray-500">
-                        [محاكاة لخريطة توزيع المشاريع]
-                    </div>
-                </div>
-                
-                <div class="bg-white p-6 rounded-2xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4">توزيع حسب النوع</h3>
-                    <div class="space-y-4">
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span class="text-sm font-medium text-blue-700">سكني</span>
-                                <span class="text-sm font-medium text-blue-700">40%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: 40%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span class="text-sm font-medium text-green-700">تعليمي</span>
-                                <span class="text-sm font-medium text-green-700">25%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-green-600 h-2.5 rounded-full" style="width: 25%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span class="text-sm font-medium text-red-700">صحي</span>
-                                <span class="text-sm font-medium text-red-700">20%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-red-600 h-2.5 rounded-full" style="width: 20%"></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="flex justify-between mb-1">
-                                <span class="text-sm font-medium text-purple-700">رعاية</span>
-                                <span class="text-sm font-medium text-purple-700">15%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                <div class="bg-purple-600 h-2.5 rounded-full" style="width: 15%"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="lg:col-span-3 bg-white p-6 rounded-2xl shadow-lg">
-                    <h3 class="text-xl font-bold mb-4">أحدث الجهات الداعمة والمبادرات</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-right">
-                            <thead>
-                                <tr class="border-b">
-                                    <th class="py-3 px-4 font-semibold text-gray-600">الجهة / المبادرة</th>
-                                    <th class="py-3 px-4 font-semibold text-gray-600">النوع</th>
-                                    <th class="py-3 px-4 font-semibold text-gray-600">المشروع المرتبط</th>
-                                    <th class="py-3 px-4 font-semibold text-gray-600">الحالة</th>
-                                    <th class="py-3 px-4 font-semibold text-gray-600">الإجراء</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-3 px-4">شركة العطاء للتطوير</td>
-                                    <td class="py-3 px-4">جهة مانحة</td>
-                                    <td class="py-3 px-4">تأهيل منازل كبار السن</td>
-                                    <td class="py-3 px-4"><span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">نشط</span></td>
-                                    <td class="py-3 px-4"><button class="text-blue-600 hover:underline transition duration-300 transform active:scale-95">عرض الميثاق</button></td>
-                                </tr>
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-3 px-4">مبادرة "دفء الشتاء"</td>
-                                    <td class="py-3 px-4">مبادرة مجتمعية</td>
-                                    <td class="py-3 px-4">-</td>
-                                    <td class="py-3 px-4"><span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-medium">قيد المراجعة</span></td>
-                                    <td class="py-3 px-4"><button class="text-blue-600 hover:underline transition duration-300 transform active:scale-95">مراجعة</button></td>
-                                </tr>
-                                <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-3 px-4">مؤسسة البناء الخيري</td>
-                                    <td class="py-3 px-4">جهة مانحة</td>
-                                    <td class="py-3 px-4">قوافل طبية</td>
-                                    <td class="py-3 px-4"><span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">نشط</span></td>
-                                    <td class="py-3 px-4"><button class="text-blue-600 hover:underline transition duration-300 transform active:scale-95">عرض الميثاق</button></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <footer class="bg-gray-800 text-gray-300 mt-12 py-12">
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-                <div>
-                    <h4 class="font-bold text-white text-lg mb-3">منصة وصال</h4>
-                    <p class="text-sm">حاضنة رقمية لتطوير عمليات ضمان جودة المحددات الاجتماعية للصحة وجودة الحياة للفئات الضعيفة.</p>
-                </div>
-                <div>
-                    <h4 class="font-bold text-white text-lg mb-3">روابط سريعة</h4>
-                    <ul class="space-y-2 text-sm">
-                        <li><a href="#" class="nav-link hover:text-white" data-target="projects-section">المشاريع</a></li>
-                        <li><a href="#" class="nav-link hover:text-white" data-target="map-section">خريطة الأثر</a></li>
-                        <li><a href="#" class="nav-link hover:text-white" data-target="donor-portal-section">كن داعماً</a></li>
-                        <li><a href="#" class="nav-link hover:text-white" data-target="initiative-portal-section">قدم مبادرة</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-bold text-white text-lg mb-3">الشركاء</h4>
-                    <ul class="space-y-2 text-sm">
-                        <li>برنامج المدن الصحية</li>
-                        <li>وزارة الموارد البشرية</li>
-                        <li>البلديات والجمعيات</li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-bold text-white text-lg mb-3">تواصل معنا</h4>
-                    <ul class="space-y-2 text-sm">
-                        <li>info@wissal.sa</li>
-                        <li>9200XXXXX</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-sm">
-                <p>&copy; 2025 منصة وصال. جميع الحقوق محفوظة.</p>
-            </div>
-        </div>
-    </footer>
-
-
-    <div id="charter-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-8 max-h-screen overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold">ميثاق الدعم الإلكتروني</h2>
-                <button id="close-charter-button" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
-            </div>
-            <div class="space-y-4 text-gray-700">
-                <p><strong>بين:</strong></p>
-                <p><strong>الطرف الأول:</strong> [اسم الجهة الداعمة]</p>
-                <p><strong>الطرف الثاني:</strong> برنامج المدن الصحية (عبر منصة وصال)</p>
-                
-                <h4 class="font-semibold pt-4">المقدمة:</h4>
-                <p>إيمانًا بأهمية التكافل المجتمعي ودعم الفئات المستهدفة، يلتزم الطرف الأول بدعم "مشروع [اسم المشروع]" الموضح في المنصة.</p>
-                
-                <h4 class="font-semibold pt-4">التزامات الطرف الأول (الداعم):</h4>
-                <ul class="list-disc list-inside space-y-2">
-                    <li>توفير التمويل المتفق عليه وقدره [المبلغ] ريال سعودي.</li>
-                    <li>الالتزام بالجدول الزمني للدفعات (إن وجدت).</li>
-                </ul>
-
-                <h4 class="font-semibold pt-4">التزامات الطرف الثاني (المنصة والمنفذ):</h4>
-                <ul class="list-disc list-inside space-y-2">
-                    <li>ضمان تنفيذ المشروع وفق النطاق المعتمد.</li>
-                    <li>توفير أعلى معايير الشفافية المالية (إصدار سند صرف رسمي).</li>
-                    <li>تزويد الطرف الأول بتقارير مرحلية وتقارير إنجاز نهائية.</li>
-                    <li>الالتزام بالمواعيد المحددة للتنفيذ.</li>
-                </ul>
-
-                <div class="pt-6">
-                    <label class="flex items-center">
-                        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 rounded me-2">
-                        <span class="text-gray-800">أقر وأتعهد بالاطلاع على كامل بنود الميثاق والموافقة عليها.</span>
-                    </label>
-                </div>
-                
-                <div class="flex justify-end gap-4 mt-8">
-                    <button id="close-charter-button-2" class="text-gray-600 bg-gray-100 px-6 py-2 rounded-lg hover:bg-gray-200 transition duration-300 transform active:scale-95">إغلاق</button>
-                    <button class="text-white bg-blue-600 px-6 py-2 rounded-lg hover:bg-blue-700 font-semibold transition duration-300 transform active:scale-95">توقيع الميثاق والاعتماد</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div id="support-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-8 max-h-screen overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-blue-700">دعم مشروع: <span class="modal-project-name"></span></h2>
-                <button class="text-gray-500 hover:text-gray-800 text-3xl close-support-modal">&times;</button>
-            </div>
-            <div class="space-y-4 text-gray-700">
-                <p>شكراً لاهتمامك بدعم هذا المشروع. دعمك يساهم مباشرة في تحسين جودة حياة المستفيدين.</p>
-                
-                <h4 class="font-semibold pt-4">طرق الدعم المتاحة:</h4>
-                <div class="space-y-3">
-                    <button class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300 transform active:scale-95" id="open-charter-from-support">
-                        💰 تمويل المشروع بالكامل (وتوقيع الميثاق)
-                    </button>
-                    <button class="w-full bg-gray-200 text-gray-800 font-semibold py-3 rounded-lg hover:bg-gray-300 transition duration-300 transform active:scale-95" disabled>
-                        💳 مساهمة جزئية (قريباً)
-                    </button>
-                </div>
-
-                <p class="text-sm text-gray-500 mt-4">عند اختيار "تمويل المشروع بالكامل"، سيتم نقلك إلى صفحة توقيع الميثاق الإلكتروني لتوثيق المساهمة باسم جهتك.</p>
-                
-                <div class="flex justify-end gap-4 mt-8">
-                    <button class="text-gray-600 bg-gray-100 px-6 py-2 rounded-lg hover:bg-gray-200 transition duration-300 transform active:scale-95 close-support-modal">إغلاق</button>
-                </div>
-                
-            </div>
-        </div>
-    </div>
-
-
-    <script>
-        // دالة تحويل الإحداثيات الجغرافية إلى إحداثيات نسبية (بالبكسل)
-        // تستخدم هذه الدالة لتحريك النقاط الـ HTML لتبقى فوق مواقعها الجغرافية على الخريطة
-        function getRelativePosition(lat, lng, center, bounds) {
-            if (!window.google || !map || !bounds) return { top: '50%', left: '50%' };
-
-            const mapDiv = document.getElementById('google-map');
-            const mapWidth = mapDiv ? mapDiv.offsetWidth : 0;
-            const mapHeight = mapDiv ? mapDiv.offsetHeight : 0;
-            if (mapWidth === 0 || mapHeight === 0) return { top: '50%', left: '50%' };
-
-
-            const proj = map.getProjection();
-            if (!proj) return { top: '50%', left: '50%' };
-            
-            const latLng = new google.maps.LatLng(lat, lng);
-            const pixel = proj.fromLatLngToPoint(latLng);
-            const boundsPixelSW = proj.fromLatLngToPoint(bounds.getSouthWest());
-            const boundsPixelNE = proj.fromLatLngToPoint(bounds.getNorthEast());
-
-            // حساب الإحداثيات بالنسبة لحاوية الخريطة
-            const pixelX = ((pixel.x - boundsPixelSW.x) / (boundsPixelNE.x - boundsPixelSW.x)) * mapWidth;
-            const pixelY = ((pixel.y - boundsPixelNE.y) / (boundsPixelSW.y - boundsPixelNE.y)) * mapHeight;
-
-            return {
-                top: `${pixelY}px`,
-                left: `${pixelX}px`
-            };
-        }
-
-
-        // ⚠️ دالة تهيئة الخريطة من Google Maps API
-        let map;
-
-        function initMap() {
-            const saudiArabiaCenter = { lat: 23.8859, lng: 45.0792 }; 
-            
-            map = new google.maps.Map(document.getElementById('google-map'), {
-                center: saudiArabiaCenter,
-                zoom: 5.5, 
-                mapId: 'DEMO_MAP_ID', 
-                mapTypeControl: false, 
-                streetViewControl: false, 
-                fullscreenControl: false, 
-            });
-
-            // إعادة رسم النقاط عند تغيير حدود الخريطة (تكبير/تصغير/تحريك)
-            google.maps.event.addListener(map, 'bounds_changed', updatePinsPositions);
-            google.maps.event.addListenerOnce(map, 'idle', updatePinsPositions);
-        }
-
-        // تحديث مواقع الـ Pins بعد تحميل الخريطة
-        function updatePinsPositions() {
-            const bounds = map.getBounds();
-            if (!bounds) return;
-
-            const mapPins = document.querySelectorAll('.map-pin, .map-label');
-            mapPins.forEach(element => {
-                const lat = parseFloat(element.getAttribute('data-lat'));
-                const lng = parseFloat(element.getAttribute('data-lng'));
-                
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    const { top, left } = getRelativePosition(lat, lng, map.getCenter(), bounds);
-                    
-                    element.style.top = top;
-                    element.style.left = left;
-                }
-            });
-        }
-
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const sections = document.querySelectorAll('.section');
-            const navLinks = document.querySelectorAll('.nav-link');
-            const mobileMenuButton = document.getElementById('mobile-menu-button');
-            const mobileMenu = document.getElementById('mobile-menu');
-            
-            const mockRegionData = {
-                'منطقة الرياض': { families: 1200, projectsDone: 8, projectsProgress: 4, contributions: '1,500,000 ريال', donors: [{ name: 'شركة العطاء للتطوير', logo: 'https://placehold.co/40x40/blue/white?text=ش1' }, { name: 'مجموعة سديم القابضة', logo: 'https://placehold.co/40x40/purple/white?text=ش4' }], active: true },
-                'منطقة مكة المكرمة': { families: 950, projectsDone: 5, projectsProgress: 2, contributions: '800,000 ريال', donors: [{ name: 'مؤسسة البناء الخيري', logo: 'https://placehold.co/40x40/green/white?text=ش2' }], active: true },
-                'المنطقة الشرقية': { families: 700, projectsDone: 10, projectsProgress: 1, contributions: '1,100,000 ريال', donors: [{ name: 'تاجر الخير (فاعل خير)', logo: 'https://placehold.co/40x40/red/white?text=ش3' }], active: true },
-                'منطقة عسير': { families: 820, projectsDone: 3, projectsProgress: 3, contributions: '450,000 ريال', donors: [], active: true },
-                'المنطقة الشمالية': { families: 1500, projectsDone: 2, projectsProgress: 5, contributions: '300,000 ريال', donors: [{ name: 'فاعل خير', logo: 'https://placehold.co/40x40/gray/white?text=خ' }], active: true },
-            };
-
-
-            function navigateTo(targetId) {
-                sections.forEach(section => {
-                    if (section.id === targetId) {
-                        section.classList.add('active');
-                    } else {
-                        section.classList.remove('active');
-                    }
-                });
-                window.scrollTo(0, 0); 
-                mobileMenu.classList.add('hidden'); 
-                
-                navLinks.forEach(link => {
-                    const targetLink = link.getAttribute('data-target');
-                    if (targetLink === targetId) {
-                        link.classList.add('text-blue-600', 'font-bold');
-                        link.classList.remove('text-gray-600', 'font-medium');
-                    } else {
-                        link.classList.remove('text-blue-600', 'font-bold');
-                        link.classList.add('text-gray-600', 'font-medium');
-                    }
-                });
-            }
-
-            navLinks.forEach(link => {
-                link.addEventListener('click', (e) => {
-                    e.preventDefault(); 
-                    const targetId = link.getAttribute('data-target');
-                    if (targetId) {
-                        navigateTo(targetId);
-                    }
-                });
-            });
-
-            mobileMenuButton.addEventListener('click', () => {
-                mobileMenu.classList.toggle('hidden');
-            });
-            
-            // تفعيل أقسام الخريطة (Pins Logic)
-            const mapPins = document.querySelectorAll('.map-pin'); 
-            const mapRegionName = document.getElementById('map-region-name');
-            const mapRegionDataContainer = document.getElementById('map-region-data');
-            
-            const dataFamilies = document.getElementById('data-families');
-            const dataProjectsDone = document.getElementById('data-projects-done');
-            const dataProjectsProgress = document.getElementById('data-projects-progress');
-            const dataContributions = document.getElementById('data-contributions');
-            const dataDonorsContainer = document.getElementById('data-donors');
-
-            mapPins.forEach(pin => {
-                const isActive = pin.getAttribute('data-active') === 'true';
-
-                if (isActive) {
-                    pin.addEventListener('click', () => {
-                        const regionName = pin.getAttribute('data-region');
-                        const data = mockRegionData[regionName];
-                        
-                        mapPins.forEach(p => p.removeAttribute('data-selected'));
-                        pin.setAttribute('data-selected', 'true');
-
-                        if (data) {
-                            mapRegionName.textContent = `بيانات: ${regionName}`;
-                            dataFamilies.textContent = data.families;
-                            dataProjectsDone.textContent = data.projectsDone;
-                            dataProjectsProgress.textContent = data.projectsProgress;
-                            dataContributions.textContent = data.contributions;
-                            
-                            dataDonorsContainer.innerHTML = ''; 
-                            if (data.donors.length > 0) {
-                                data.donors.forEach(donor => {
-                                    const donorEl = document.createElement('div');
-                                    donorEl.className = 'flex items-center p-2 bg-gray-50 rounded-lg';
-                                    donorEl.innerHTML = `
-                                        <img src="${donor.logo}" alt="${donor.name}" class="w-8 h-8 rounded-full me-3">
-                                        <span class="font-medium text-sm">${donor.name}</span>
-                                    `;
-                                    dataDonorsContainer.appendChild(donorEl);
-                                });
-                            } else {
-                                dataDonorsContainer.innerHTML = '<p class="text-sm text-gray-500">لا يوجد داعمون بارزون حاليًا. كن أول الداعمين!</p>';
-                            }
-                            
-                            mapRegionDataContainer.classList.remove('hidden');
-
-                            // تحديث مركز الخريطة إلى المنطقة المحددة (إذا كانت الخريطة محملة)
-                            if (map && !isNaN(parseFloat(pin.dataset.lat))) {
-                                map.setCenter(new google.maps.LatLng(parseFloat(pin.dataset.lat), parseFloat(pin.dataset.lng)));
-                                map.setZoom(7); // زيادة التقريب قليلاً
-                            }
-                        }
-                    });
-                }
-            });
-
-            // Modal Logic (المنطق الخاص بالنوافذ المنبثقة)
-            const supportModal = document.getElementById('support-modal');
-            const openSupportButtons = document.querySelectorAll('.open-support-modal');
-            const closeSupportButtons = document.querySelectorAll('.close-support-modal');
-            const modalProjectNameEl = supportModal.querySelector('.modal-project-name');
-            const charterModal = document.getElementById('charter-modal');
-            const openCharterFromSupportBtn = document.getElementById('open-charter-from-support');
-            const closeCharterButtons = document.querySelectorAll('#close-charter-button, #close-charter-button-2');
-
-
-            openSupportButtons.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    modalProjectNameEl.textContent = btn.getAttribute('data-project-name') || 'المحدد';
-                    supportModal.classList.remove('hidden');
-                });
-            });
-
-            closeSupportButtons.forEach(btn => btn.addEventListener('click', () => supportModal.classList.add('hidden')));
-            supportModal.addEventListener('click', (e) => { if (e.target === supportModal) supportModal.classList.add('hidden'); });
-            closeCharterButtons.forEach(btn => btn.addEventListener('click', () => charterModal.classList.add('hidden')));
-            charterModal.addEventListener('click', (e) => { if (e.target === charterModal) charterModal.classList.add('hidden'); });
-
-            if (openCharterFromSupportBtn) {
-                openCharterFromSupportBtn.addEventListener('click', () => {
-                    supportModal.classList.add('hidden'); 
-                    charterModal.classList.remove('hidden'); 
-                });
-            }
-
-            navigateTo('home-section');
-            const homeLink = document.querySelector('.nav-link[data-target="home-section"]');
-            if (homeLink) {
-                homeLink.classList.add('text-blue-600', 'font-bold');
-                homeLink.classList.remove('text-gray-600', 'font-medium');
-            }
-
-        });
-    </script>
-</body>
-</html>
